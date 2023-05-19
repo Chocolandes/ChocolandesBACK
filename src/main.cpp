@@ -3,6 +3,11 @@
 #include "HX711.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <AppREST.h>
+
 // Pines Motobomb
 #define canal_a  33
 #define canal_b  32
@@ -20,6 +25,7 @@ DallasTemperature sensorDS18B20(&oneWireObjeto);
 int pasos;
 bool inicio = false;
 float peso_deseado = 0;
+float peso_deseado_anterior = 0;
 float peso_inicial = 0;
 float peso = 0;
 int pwm;
@@ -34,11 +40,21 @@ bool valido;
 bool continuar = false;
 bool iniciar_mezclar = false;
 int rpm_deseado = 0;
+int rpm_deseado_anterior = 0;
 int del = 0;
 bool agregar = false;
 float peso_acumulado = 0;
 int rpm_recibido = 100;
 float temp = 0;
+
+// Configuracion para el rest
+using namespace AppREST;
+bool wireless_mode = true;
+float* pesoPointer;
+int* rpmPointer;
+float* tempPointer;
+int* rpmDeseadoPointer;
+float* pesoDeseadoPointer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 void definir_variables(float peso_deseado){
@@ -109,6 +125,16 @@ void preguntar_solvente(){
     }
   } 
 
+
+void echarAgua(){
+  continuar = false;
+  Serial.print("Peso a completar: ");
+  Serial.println(peso_deseado);
+  definir_variables(peso_deseado);
+  peso_ant = balanza.get_units(4) - peso_inicial;
+  agregar = true;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void agregar_soluto(){
   peso = balanza.get_units(10) - peso_inicial; // Entrega el peso actualment medido en gramos
@@ -125,7 +151,10 @@ void agregar_soluto(){
   else {
     agregar_soluto();
     }      
-  }
+}
+
+
+
   
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void preguntar_rpms(){
@@ -142,6 +171,19 @@ void preguntar_rpms(){
     Wire.endTransmission(); // End transmission
     }
   } 
+
+void cambiar_rpms(){
+  if (rpm_deseado <10){
+      Serial.print("ELejir otro valor"); 
+  }    
+  else {
+    Serial.print("RPMs deseadas: ");
+    Serial.println(rpm_deseado);
+    Wire.beginTransmission(0x23); // transmit to device #8
+    Wire.write((uint8_t*)&rpm_deseado, sizeof(rpm_deseado)); // Send integer value to slave
+    Wire.endTransmission(); // End transmission
+  }
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void agregar_solvente(float peso, float peso_ant,int pwm, int adicion, float porc1, float porc2, float porc3){
@@ -175,6 +217,55 @@ void agregar_solvente(float peso, float peso_ant,int pwm, int adicion, float por
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
+  //////////////////////////////////////////////////////
+  //Configurar lo de aplicacion 
+
+  //Apuntadores
+  pesoPointer = &peso;
+  rpmPointer = &rpm_recibido;
+  tempPointer = &temp;
+  rpmDeseadoPointer = &rpm_deseado;
+  pesoDeseadoPointer = &peso_deseado;
+
+  //Red wifi
+   if (wireless_mode){
+    //Set la ip
+    IPAddress local_ip(192,168,1,1);
+    IPAddress gateway(192,168,1,1);
+    IPAddress subnet(255,255,255,0);
+
+    WiFi.softAP("wifi", "123456789");
+    WiFi.softAPConfig(local_ip, gateway, subnet);
+    delay(100);
+
+    IPAddress IP = WiFi.softAPIP();
+    Serial.print("AP IP address");
+    Serial.println(IP);
+
+
+    //Set webserver
+    _serverPointer = new WebServer(80); 
+    _serverPointer->enableCORS();
+
+    //Vincular datos
+    AppREST::linkServer(_serverPointer);
+    AppREST::linkPeso(pesoPointer);
+    AppREST::linkRPM(rpmPointer);
+    AppREST::linkTemp(tempPointer);
+    AppREST::linkRPMDesado(rpmDeseadoPointer);
+    AppREST::linkPesoDeseado(pesoDeseadoPointer);
+
+    //Configurar GET
+    _serverPointer->on("/valores", HTTP_GET, AppREST::GETValores);
+    _serverPointer->on("/rpmDeseado", HTTP_PUT, AppREST::PUTrpmDeseado);
+    _serverPointer->on("/pesoDeseado", HTTP_PUT, AppREST::PUTPesoDeseado);
+
+    //Inicializar
+    _serverPointer->begin();
+  }
+
+
+  ////////////////////////////////////////////////////////
 
   balanza.set_scale(1084.9);
   sensorDS18B20.begin(); 
@@ -190,6 +281,10 @@ void setup() {
  }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() { 
+  //SErvidor de REST
+  _serverPointer->handleClient();
+
+
   peso = balanza.get_units(4) - peso_inicial; // Entrega el peso actualment medido en gramos
   Serial.print("Masa actual: "); 
   Serial.println(peso); 
@@ -236,4 +331,18 @@ void loop() {
       }
   }
 
+  if(rpm_deseado_anterior!= rpm_deseado){
+    Serial.print("Cambiar RPMs");
+    rpm_deseado_anterior = rpm_deseado;
+    cambiar_rpms();
+  }
+
+  if(peso_deseado_anterior!=peso_deseado){
+    Serial.print("Echar Agua");
+    Serial.print(peso_deseado);
+    peso_deseado_anterior = peso_deseado;
+    agregar==true;
+    peso_acumulado = peso;
+    echarAgua();
+  }
 }
