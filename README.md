@@ -1,4 +1,4 @@
-# Instrumentacion-eq11
+# ChocolandesBACK
 ## Integrantes:
 * Guerrero Rios Sebastian 
 * Guayacan Mesa Sebastian 
