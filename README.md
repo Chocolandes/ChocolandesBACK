@@ -1,72 +1,83 @@
 # ChocolandesBACK
-## Integrantes:
+In this repository you can find the codes that allow you to build the application  that controls and are suposed to be uploaded in the microcontrollers of an electronic device that has the ability to measure mass, dispense a liquid, mix the liquid with a stepper motor and measure the temperature of the liquid, all synchronously and continous.
+## Authors:
 * Guerrero Rios Sebastian 
 * Guayacan Mesa Sebastian 
 * Ramirez Cepeda Yaisa Catalina
 * Reyes Corredor Juan Camilo
 
-## Materiales utilizados
-
+## Material's list:
+### In this project we use two ESP32 microcontrollers. One is dedicated to the stepper motor movement (ESP-MOT) and the other is in charge of all the other functionalities (ESP-MAIN).
 ### L293D
-Driver para 2 motores DC
+Dual DC motor driver 
 
-* In1: Pin9 Arduino
-* In2: Pin10 Arduino
-* Out1: Cable rojo motobomba
-* Out2: Cable negro motobomba
+* In1: D33 ESP-MAIN
+* In2: D32 ESP-MAIN
+* Out1: Red wire motor pump
+* Out2: Black wire motor pump
 * En1: 5V
 * VCC: 5V
 * Vss: 12V
 * Pin 4 y 5: GND
 
 ### HX711
-Conversor ACDC para celda de carga
+Load cell ADC converter
 
 * E+: Red
 * E-: Black
 * A+: Withe
 * A-: Green
-* Dt: Pin A1 arduino
-* Sck: Pin A0 arduino
+* Dt: D26 ESP-MAIN
+* Sck: D27 ESP-MAIN
 * Vcc: 5V
 
 ### A4988
-Driver para motor paso a paso
-* Dir: Pin 5 arduino
-* Step: Pin 4 arduino
+Stepper motor driver 
+* Dir: D19  ESP-MOT
+* Step: D18  ESP-MOT
+* Enable: D5  ESP-MOT
 * Vdd: 5V
-* Reset y Sleep van conectados entre si
+* Reset & Sleep Are connected between them
 * 2B: Black 
 * 2A: Green
 * 1A: Blue
 * 1B: Red
-* Vmot: Alimentación motor (15V)
+* Vmot: External power (12V)
 
 ### NEMA 17HS4401s
-Motor paso a paso con resolución de 1.8°
+Stepper motor with 1.8° resolution
 * Black: 2B
 * Green: 2A
 * Blue: 1A
 * Red: 1B
-
-### Bomba de agua
-*Red: Out1 L293D
+### HC020P
+* Vdd: 5V
+* Data: D34 ESP-MOT
+### DS18B20
+* Vdd: 5V
+* Data: D13 ESP-MAIN
+### Motor Pump
+* Red: Out1 L293D
 * Black: Out2 L293D
-### Celda de carga
+### Load Cell
 * Red: E+
 * Black: E-
 * Withe: A+
 * Green: A-
 
-### Arduino Uno
-* Pin9 Arduino: In1 L293D
-* Pin10 Arduino: In2 L293D
-* Pin 5 arduino: Dir A4988 
-* Pin 4 arduino: Step A4988
-* Pin A1 arduino: Dt HX711
-* Pin A0 arduino: Sck HX711
+### ESP-MAIN
+* D33: In1 L293D
+* D32: In2 L293D
+* D26: Dt HX711
+* D27: Sck HX711
+* D13: Data DS18B20
+### ESP-MOT
+* D5: Enable A4988
+* D19: DIR A4988
+* D18: STEP A4988
+* D34: Data HC020P
 
-## Códigos presentes en el repo:
+## Repository's codes:
 * Balanza_Bomba:
 Por medio de la consola le pide al usuario que indique la cantidad de masa que desea al final de la mezcla, incluyendo soluto y solvente. Aún no es del todo preciso. Al terminar de dispensar el líquido se activa una funci
 * motor_paso_paso:
