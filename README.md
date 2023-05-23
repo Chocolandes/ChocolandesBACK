@@ -78,7 +78,11 @@ Stepper motor with 1.8° resolution
 * D34: Data HC020P
 
 ## Repository's codes:
-* Balanza_Bomba:
-Por medio de la consola le pide al usuario que indique la cantidad de masa que desea al final de la mezcla, incluyendo soluto y solvente. Aún no es del todo preciso. Al terminar de dispensar el líquido se activa una funci
-* motor_paso_paso:
-Por medio de la consola le pide al usuario que indique la cantidad de pasos que el motor debe dar.
+* /include/main1.cpp:
+  Code that runs on the ESP-MAIN.  It measures mass, dispenses water, measures temperature, communicates via I2C with the ESP-MOT to move and measure the speed of the stepper motor, and communicates via Wi-Fi with the device's application.
+
+
+* /include/main2.cpp:
+  Code that runs on the ESP-MOT. It communicates via I2C with the ESP-MAIN to receive the instructions that move the  stepper motor.
+
+  
