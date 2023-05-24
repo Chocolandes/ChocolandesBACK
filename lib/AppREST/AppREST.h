@@ -7,11 +7,12 @@ StaticJsonDocument<1000> jsonDocument;
 char buffer[1000];
 
 //Funciones de manejo JSON Auxiliares
-void create_json(float temp, int rpm, float peso) {  
+void create_json(float temp, int rpm, float peso, String estado) {  
   jsonDocument.clear();
   jsonDocument["temp"] = temp;
   jsonDocument["rpm"] = rpm;
   jsonDocument["peso"] = peso;
+  jsonDocument["estado"] = estado;
   serializeJson(jsonDocument, buffer);  
 }
 
@@ -24,6 +25,7 @@ namespace AppREST{
   float* _valorTemp;
   int* _valorRMPDeseado;
   float* _valorPesoDeseado;
+  String* _valorEstado;
 
   void linkServer(WebServer* serverPointer){
       _serverPointer = serverPointer;
@@ -33,7 +35,7 @@ namespace AppREST{
 
   void GETValores(){
     Serial.println("GET valor");
-    create_json((*_valorTemp), (*_valorRPM), (*_valorPeso));
+    create_json((*_valorTemp), (*_valorRPM), (*_valorPeso), (*_valorEstado));
     (*_serverPointer).send(200, "application/json", buffer);
   }
 
@@ -81,6 +83,10 @@ namespace AppREST{
 
   void linkPesoDeseado(float* valorPesoDeseado){
     _valorPesoDeseado = valorPesoDeseado;
+  }
+
+  void linkEstado(String* valorEstado){
+    _valorEstado = valorEstado;
   }
 }
 
