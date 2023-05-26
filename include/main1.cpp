@@ -46,6 +46,7 @@ bool agregar = false;
 float peso_acumulado = 0;
 int rpm_recibido = 100;
 float temp = 0;
+String estado = "Esperando";
 
 // Configuracion para el rest
 using namespace AppREST;
@@ -55,6 +56,7 @@ int* rpmPointer;
 float* tempPointer;
 int* rpmDeseadoPointer;
 float* pesoDeseadoPointer;
+String* estadoPointer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 void definir_variables(float peso_deseado){
@@ -71,8 +73,8 @@ void definir_variables(float peso_deseado){
     pwm = 180;
     adicion = 1;
     porc1 = 0.8;
-    porc2 = 0.87;
-    porc3 = 0.89;
+    porc2 = 0.8;
+    porc3 = 0.85;
   }
   else if((100 < peso_deseado)&& (peso_deseado <= 150)) {
     Serial.println("ENTRE 100 Y 200");
@@ -88,7 +90,7 @@ void definir_variables(float peso_deseado){
     adicion = 1;
     porc1 = 0.8;
     porc2 = 0.85;
-    porc3 = 0.93;
+    porc3 = 0.9;
   }
   else if((200 < peso_deseado)&& (peso_deseado <= 300)) {
     Serial.println("ENTRE 200 Y 300");
@@ -96,7 +98,7 @@ void definir_variables(float peso_deseado){
     adicion = 0;
     porc1 = 0.8;
     porc2 = 0.9;
-    porc3 = 0.945;
+    porc3 = 0.96;
   }
 
   else {
@@ -104,7 +106,7 @@ void definir_variables(float peso_deseado){
     adicion = 0;
     porc1 = 0.8;
     porc2 = 0.9;
-    porc3 = 0.98;
+    porc3 = 0.91;
     }
   }    
 
@@ -218,7 +220,8 @@ void agregar_solvente(float peso, float peso_ant,int pwm, int adicion, float por
 
 void setup() {
   //////////////////////////////////////////////////////
-  //Configurar lo de aplicacion 
+  //Configurar lo de aplicacion
+  Serial.begin(9600);
 
   //Apuntadores
   pesoPointer = &peso;
@@ -226,22 +229,41 @@ void setup() {
   tempPointer = &temp;
   rpmDeseadoPointer = &rpm_deseado;
   pesoDeseadoPointer = &peso_deseado;
+  estadoPointer = &estado;
 
   //Red wifi
    if (wireless_mode){
     //Set la ip
-    IPAddress local_ip(192,168,1,1);
-    IPAddress gateway(192,168,1,1);
-    IPAddress subnet(255,255,255,0);
+    //IPAddress local_ip(192,168,1,1);
+    //IPAddress gateway(192,168,1,1);
+    //IPAddress subnet(255,255,255,0);
+//
+    //WiFi.softAP("wifi", "123456789");
+    //WiFi.softAPConfig(local_ip, gateway, subnet);
+    //delay(100);
+//
+    //IPAddress IP = WiFi.softAPIP();
+    //Serial.print("AP IP address");
+    //Serial.println(IP);
 
-    WiFi.softAP("wifi", "123456789");
-    WiFi.softAPConfig(local_ip, gateway, subnet);
-    delay(100);
+    //connect to WIFI
+    
+    WiFi.mode(WIFI_STA);
+    WiFi.begin("robocol_router","12345678");
+    
+    while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    delay(1000);
+  }
+  Serial.println(WiFi.localIP());
 
-    IPAddress IP = WiFi.softAPIP();
-    Serial.print("AP IP address");
-    Serial.println(IP);
 
+
+
+  Serial.println('\n');
+  Serial.println("Connection established!");  
+  Serial.print("IP address:\t");
+  Serial.println(WiFi.localIP()); 
 
     //Set webserver
     _serverPointer = new WebServer(80); 
@@ -254,6 +276,7 @@ void setup() {
     AppREST::linkTemp(tempPointer);
     AppREST::linkRPMDesado(rpmDeseadoPointer);
     AppREST::linkPesoDeseado(pesoDeseadoPointer);
+    AppREST::linkEstado(estadoPointer);
 
     //Configurar GET
     _serverPointer->on("/valores", HTTP_GET, AppREST::GETValores);
@@ -269,7 +292,7 @@ void setup() {
 
   balanza.set_scale(1084.9);
   sensorDS18B20.begin(); 
-  Serial.begin(9600);
+  
   Serial.println("HOLAAAAAAAAAAAAa");
   pinMode(canal_a,OUTPUT);
   pinMode(canal_b, OUTPUT);
@@ -286,29 +309,34 @@ void loop() {
 
 
   peso = balanza.get_units(4) - peso_inicial; // Entrega el peso actualment medido en gramos
-  Serial.print("Masa actual: "); 
-  Serial.println(peso); 
+  //Serial.print("Masa actual: "); 
+  //Serial.println(peso); 
 
   //Para obtener RPM del segundo micro
   Wire.requestFrom(0X23, 2);//Direccion, bytes
   uint8_t highByte = Wire.read();
   uint8_t lowByte = Wire.read();
   rpm_recibido = (highByte << 8) | lowByte;
-  Serial.print("RPM actual: ");
-  Serial.println(rpm_recibido);
+  //Serial.print("RPM actual: ");
+  //Serial.println(rpm_recibido);
 
   //Recibir valor temperatura
   sensorDS18B20.requestTemperatures();
   temp = sensorDS18B20.getTempCByIndex(0) + 1;
-  Serial.print("Temperatura actual: ");
-  Serial.println(temp, 1);
+  //Serial.print("Temperatura actual: ");
+  //Serial.println(temp, 1);
 
-  Serial.println("--------------");
+  //Serial.println("--------------");
   //Serial.println(agregar);
 
   if (agregar == true){    
     agregar_solvente(peso, peso_ant,pwm,adicion,porc1,porc2,porc3);  
     }
+
+  else{
+    estado = "Esperando";
+  }
+
   peso_ant = peso;
   
   if (Serial.available() > 0){
@@ -332,14 +360,16 @@ void loop() {
   }
 
   if(rpm_deseado_anterior!= rpm_deseado){
-    Serial.print("Cambiar RPMs");
+    //Serial.print("Cambiar RPMs");
+    estado = "Cambiando RPM";
     rpm_deseado_anterior = rpm_deseado;
     cambiar_rpms();
   }
 
   if(peso_deseado_anterior!=peso_deseado){
-    Serial.print("Echar Agua");
-    Serial.print(peso_deseado);
+    estado = "Cambiando Peso";
+    //Serial.print("Echar Agua");
+   // Serial.print(peso_deseado);
     peso_deseado_anterior = peso_deseado;
     agregar==true;
     peso_acumulado = peso;

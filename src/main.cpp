@@ -220,7 +220,8 @@ void agregar_solvente(float peso, float peso_ant,int pwm, int adicion, float por
 
 void setup() {
   //////////////////////////////////////////////////////
-  //Configurar lo de aplicacion 
+  //Configurar lo de aplicacion
+  Serial.begin(9600);
 
   //Apuntadores
   pesoPointer = &peso;
@@ -291,7 +292,7 @@ void setup() {
 
   balanza.set_scale(1084.9);
   sensorDS18B20.begin(); 
-  Serial.begin(9600);
+  
   Serial.println("HOLAAAAAAAAAAAAa");
   pinMode(canal_a,OUTPUT);
   pinMode(canal_b, OUTPUT);
@@ -308,24 +309,24 @@ void loop() {
 
 
   peso = balanza.get_units(4) - peso_inicial; // Entrega el peso actualment medido en gramos
-  Serial.print("Masa actual: "); 
-  Serial.println(peso); 
+  //Serial.print("Masa actual: "); 
+  //Serial.println(peso); 
 
   //Para obtener RPM del segundo micro
   Wire.requestFrom(0X23, 2);//Direccion, bytes
   uint8_t highByte = Wire.read();
   uint8_t lowByte = Wire.read();
   rpm_recibido = (highByte << 8) | lowByte;
-  Serial.print("RPM actual: ");
-  Serial.println(rpm_recibido);
+  //Serial.print("RPM actual: ");
+  //Serial.println(rpm_recibido);
 
   //Recibir valor temperatura
   sensorDS18B20.requestTemperatures();
   temp = sensorDS18B20.getTempCByIndex(0) + 1;
-  Serial.print("Temperatura actual: ");
-  Serial.println(temp, 1);
+  //Serial.print("Temperatura actual: ");
+  //Serial.println(temp, 1);
 
-  Serial.println("--------------");
+  //Serial.println("--------------");
   //Serial.println(agregar);
 
   if (agregar == true){    
@@ -359,7 +360,7 @@ void loop() {
   }
 
   if(rpm_deseado_anterior!= rpm_deseado){
-    Serial.print("Cambiar RPMs");
+    //Serial.print("Cambiar RPMs");
     estado = "Cambiando RPM";
     rpm_deseado_anterior = rpm_deseado;
     cambiar_rpms();
@@ -367,8 +368,8 @@ void loop() {
 
   if(peso_deseado_anterior!=peso_deseado){
     estado = "Cambiando Peso";
-    Serial.print("Echar Agua");
-    Serial.print(peso_deseado);
+    //Serial.print("Echar Agua");
+   // Serial.print(peso_deseado);
     peso_deseado_anterior = peso_deseado;
     agregar==true;
     peso_acumulado = peso;
