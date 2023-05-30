@@ -1,54 +1,46 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include "HX711.h"
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include <WiFi.h>
-#include <WiFiClient.h>
+// Librerias
+#include <Arduino.h>  // This library is just needed if you run the code using Platformio
+#include <Wire.h>  // Library for the i2c communication protocol
+#include "HX711.h"  // HX711 Module
+#include <OneWire.h> // Communication protocol used in the temperature sensor
+#include <DallasTemperature.h> 
+#include <WiFi.h> // For the app
+#include <WiFiClient.h> 
 #include <WebServer.h>
 #include <AppREST.h>
 
-// Pines Motobomb
-#define canal_a  33
+// Motor pump control pins
 #define canal_b  32
-// Pines Bal
+// Scale control pins
 #define DOUT  26
 #define CLK  27
 HX711 balanza(DOUT, CLK);
-// Pines Temp
+// Temperature sensor pin
 #define tempSensor 13
 OneWire oneWireObjeto(tempSensor);
 DallasTemperature sensorDS18B20(&oneWireObjeto);
 
-// Variables
+// Variables are all global and may change in the functions and depending on the state of the machine
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int pasos;
-bool inicio = false;
 float peso_deseado = 0;
 float peso_deseado_anterior = 0;
 float peso_inicial = 0;
 float peso = 0;
-int pwm;
-int adicion;
-float masa;
 float porc1;
 float porc2;
 float porc3;
 float peso_ant;
-float pesito;
 bool valido;
 bool continuar = false;
-bool iniciar_mezclar = false;
 int rpm_deseado = 0;
 int rpm_deseado_anterior = 0;
-int del = 0;
 bool agregar = false;
 float peso_acumulado = 0;
 int rpm_recibido = 100;
 float temp = 0;
 String estado = "Esperando";
 
-// Configuracion para el rest
+// App configuration
 using namespace AppREST;
 bool wireless_mode = true;
 float* pesoPointer;
@@ -58,75 +50,69 @@ int* rpmDeseadoPointer;
 float* pesoDeseadoPointer;
 String* estadoPointer;
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// This function defines the mass percentages at which the motor pump should change its pwm or stop serving. For example, if the mass requiered is 
+// less than 50g, when the mass reaches 90% of this value the pwm input of the pump will decrease to 150, and when it reaches the 92% it will turn off
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 void definir_variables(float peso_deseado){
   if(peso_deseado <=50) {
-    Serial.println("MENOR A 50");
-    pwm = 180;
-    adicion = 0;
     porc1 = 0.8;
     porc2 = 0.9;
     porc3 = 0.92;
     }
   else if( (50< peso_deseado) && (peso_deseado <= 100)) {
-    Serial.println("ENTRE 50 Y 100");
-    pwm = 180;
-    adicion = 1;
     porc1 = 0.8;
     porc2 = 0.8;
     porc3 = 0.85;
   }
   else if((100 < peso_deseado)&& (peso_deseado <= 150)) {
-    Serial.println("ENTRE 100 Y 200");
-    pwm = 180;
-    adicion = 1;
     porc1 = 0.8;
     porc2 = 0.8;
     porc3 = 0.85;
   }
   else if((150 < peso_deseado)&& (peso_deseado <= 200)) {
-    Serial.println("ENTRE 100 Y 200");
-    pwm = 180;
-    adicion = 1;
     porc1 = 0.8;
     porc2 = 0.85;
     porc3 = 0.9;
   }
   else if((200 < peso_deseado)&& (peso_deseado <= 300)) {
-    Serial.println("ENTRE 200 Y 300");
-    pwm = 180;
-    adicion = 0;
     porc1 = 0.8;
     porc2 = 0.9;
     porc3 = 0.96;
   }
 
   else {
-    pwm = 180;
-    adicion = 0;
     porc1 = 0.8;
     porc2 = 0.9;
     porc3 = 0.91;
     }
   }    
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// This function is used to ask the user the mass to complete, to access this function you must send a 2 in the serial terminal or input mass 
+// in the app. 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void preguntar_solvente(){
   continuar = false;
   Serial.println("Introduzca el peso que desea completar con el solvente"); 
   String peso_string = Serial.readString();
   peso_deseado = peso_string.toInt();
-  if (peso_deseado <10){
+  if (peso_deseado <10){ // The user must input more than 10 grams in order to have a precise outcome
       preguntar_solvente(); }    
   else {
     Serial.print("Peso a completar: ");
     Serial.println(peso_deseado);
-    definir_variables(peso_deseado);
+    definir_variables(peso_deseado); // The function previously mentioned to define the global values of the percentages
     peso_ant = balanza.get_units(4) - peso_inicial;
     agregar = true;
     }
   } 
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// This function updates the percentages values of the pouring function if the mass has not been reached
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 
 void echarAgua(){
   continuar = false;
@@ -137,15 +123,16 @@ void echarAgua(){
   agregar = true;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// This function is used in case the user wants to define a new zero. WHen the function is called, the scale tares itself again.
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void agregar_soluto(){
   peso = balanza.get_units(10) - peso_inicial; // Entrega el peso actualment medido en gramos
-  //Serial.println(peso);
-  String ingreso = Serial.readString();
+  String ingreso = Serial.readString(); // Reads the command inserted in the loop
   Serial.print("Ingreso: ");
   Serial.println(ingreso);
   Serial.print("Masa del soluto: ");
-  Serial.println(peso);
+  Serial.println(peso); // Prints the actual mass after taring the scale
   if(ingreso!="")
   {
      preguntar_solvente();
@@ -156,14 +143,14 @@ void agregar_soluto(){
 }
 
 
-
-  
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// Function called to changes the mixing speed. The main esp sends the desired mixing speed to the other esp via i2c
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void preguntar_rpms(){
   Serial.println("Introduzca las RPMs a las que desea mezclar"); 
   String rpm_string = Serial.readString();
   rpm_deseado = rpm_string.toInt();
-  if (rpm_deseado <10){
+  if (rpm_deseado <20){ //Mixing speed must be higher than 20 rpm
       preguntar_rpms(); }    
   else {
     Serial.print("RPMs deseadas: ");
@@ -173,6 +160,11 @@ void preguntar_rpms(){
     Wire.endTransmission(); // End transmission
     }
   } 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// THis function is called in case the rpm value recieved in the previous function has not been reached. The system keeps sending the desired
+// value until it is exactly the one that the user asked for
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 
 void cambiar_rpms(){
   if (rpm_deseado <10){
@@ -187,42 +179,37 @@ void cambiar_rpms(){
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+// Function to pour the water, the function recieves the values of the percentages defined before and the current and previous values of the weight
+// This function has an special consideration: the noise of the mesurement. In some occassions, when the motor pump is turned on the weight measured
+//  by the scale takes negative or non reasonable values. For this reason, we decided to define those measurments as "not valid" and stop the motor pump.
+// Once the values are recieved well again, the motor pump continues pouring the liquid. 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void agregar_solvente(float peso, float peso_ant,int pwm, int adicion, float porc1, float porc2, float porc3){
+void agregar_solvente(float peso, float peso_ant,float porc1, float porc2, float porc3){
   Serial.println ("Debe agregar el solvente");
-  valido = true; 
-  if (abs(peso) -abs( peso_ant) >= 20){
+  valido = true; // Control value to check if the value is not valid
+  if (abs(peso) -abs( peso_ant) >= 20){  // In case there is noise in the measurement
         Serial.println("invalido");
-        analogWrite(canal_b,0);
+        analogWrite(canal_b,0); // the motor pump is turned off
         delay(20);
         valido = false;
         }  
   if (valido == true){
     if (peso_deseado*porc1 >= peso)
-      //digitalWrite(canal_b,HIGH);
       analogWrite(canal_b,200);
     if (peso_deseado*porc1 < peso <= peso_deseado*porc2)
-      //digitalWrite(canal_b,HIGH);
-      //digitalWrite(Step, 0);
       analogWrite(canal_b, 150);
-    if (peso>= peso_deseado*porc3){
+    if (peso>= peso_deseado*porc3){ // Stop if the mass percentage 3 is reached
         analogWrite(canal_b,0);
-        Serial.println("Mayor, mezclando ");
-        agregar = false;
-        iniciar_mezclar = true;
-        //preguntar_rpms();
-    } 
+        agregar = false; // Boolean value to stop function in loop
+            } 
   }
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void setup() {
-  //////////////////////////////////////////////////////
-  //Configurar lo de aplicacion
+  /////////////////////////////////////////////////////
   Serial.begin(9600);
-
   //Apuntadores
   pesoPointer = &peso;
   rpmPointer = &rpm_recibido;
@@ -231,7 +218,7 @@ void setup() {
   pesoDeseadoPointer = &peso_deseado;
   estadoPointer = &estado;
 
-  //Red wifi
+  //Wifi network
    if (wireless_mode){
     //Set la ip
     //IPAddress local_ip(192,168,1,1);
@@ -256,10 +243,6 @@ void setup() {
     delay(1000);
   }
   Serial.println(WiFi.localIP());
-
-
-
-
   Serial.println('\n');
   Serial.println("Connection established!");  
   Serial.print("IP address:\t");
@@ -290,15 +273,13 @@ void setup() {
 
   ////////////////////////////////////////////////////////
 
-  balanza.set_scale(1084.9);
-  sensorDS18B20.begin(); 
+  balanza.set_scale(1084.9); // Tare the scale when the code is initialized
+  sensorDS18B20.begin(); // Initialize the temperature sensor
   
-  Serial.println("HOLAAAAAAAAAAAAa");
-  pinMode(canal_a,OUTPUT);
-  pinMode(canal_b, OUTPUT);
-  peso_inicial = balanza.get_units(40); // No se por que carajo el peso estaba llegando negativo pero weno
+  pinMode(canal_b, OUTPUT); // Motorpump pin as output
+  peso_inicial = balanza.get_units(40); // Measure the inicial value of the scale after being tared
   Serial.println(peso_inicial);
-  Serial.println ("CALIBRADO");
+  Serial.println ("CALIBRADO"); // Confirm the scale is ready
   Wire.begin(); // join i2c bus (address optional for master)
 
  }
@@ -330,49 +311,46 @@ void loop() {
   //Serial.println(agregar);
 
   if (agregar == true){    
-    agregar_solvente(peso, peso_ant,pwm,adicion,porc1,porc2,porc3);  
+    agregar_solvente(peso, peso_ant, porc1,porc2,porc3);  // Pour liquid 
     }
 
   else{
     estado = "Esperando";
   }
 
-  peso_ant = peso;
+  peso_ant = peso; // Present value of the weight is stored as previous for the agregar_solvente function
   
-  if (Serial.available() > 0){
+  if (Serial.available() > 0){ // Read the commands recieved from serial
       int comando = Serial.readString().toInt();
       Serial.println(comando);
    
-    if (comando == 1){ // Volver a mandar rpm del motor
-      preguntar_rpms();
+    if (comando == 1){ // Change rpm value
+      preguntar_rpms(); // Call rpm change function
     }
-    else if (comando == 2){ //Volver a servir liquido
-      agregar==true;
+    else if (comando == 2){ // Pour liquid
+      agregar==true; // Boolean to control loop of agregar_solvente as true
       peso_acumulado = peso;
-      //peso_inicial = (balanza.get_units(20)); // Entrega el peso actualment medido en gramos
       preguntar_solvente();
       }
-    else if (comando  == 3){ // Volver a tarar
+    else if (comando  == 3){ // Tare the scale again and define a new zero
       peso_acumulado = peso;
       peso_inicial = (balanza.get_units(20)); // Entrega el peso actualment medido en gramos
       agregar_soluto();
       }
   }
 
-  if(rpm_deseado_anterior!= rpm_deseado){
+  if(rpm_deseado_anterior!= rpm_deseado){ // Keep correcting the rpm if the desired value has not been reached
     //Serial.print("Cambiar RPMs");
     estado = "Cambiando RPM";
     rpm_deseado_anterior = rpm_deseado;
     cambiar_rpms();
   }
 
-  if(peso_deseado_anterior!=peso_deseado){
+  if(peso_deseado_anterior!=peso_deseado){ // Keep adding water if the mass has not been reached 
     estado = "Cambiando Peso";
-    //Serial.print("Echar Agua");
-   // Serial.print(peso_deseado);
     peso_deseado_anterior = peso_deseado;
     agregar==true;
     peso_acumulado = peso;
-    echarAgua();
+    echarAgua(); // 
   }
 }
