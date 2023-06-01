@@ -210,7 +210,8 @@ void agregar_solvente(float peso, float peso_ant,float porc1, float porc2, float
 void setup() {
   /////////////////////////////////////////////////////
   Serial.begin(9600);
-  //Apuntadores
+  //Pointer, they determine the memory address of the variables
+  // The data is sent via I2C so the ESP32 can read it
   pesoPointer = &peso;
   rpmPointer = &rpm_recibido;
   tempPointer = &temp;
@@ -234,15 +235,20 @@ void setup() {
     //Serial.println(IP);
 
     //connect to WIFI
-    
+    //The connection is established with the router
+    //WIFI_STA is the mode established to connect to the router
     WiFi.mode(WIFI_STA);
+    
+    //SSID and password of the network
     WiFi.begin("robocol_router","12345678");
     
+    //while the network is not connected, a dot is printed
     while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     delay(1000);
   }
-  Serial.println(WiFi.localIP());
+  //When the network is connected, the IP address is printed
+  Serial.println(WiFi.localIP()); 
   Serial.println('\n');
   Serial.println("Connection established!");  
   Serial.print("IP address:\t");
@@ -250,9 +256,14 @@ void setup() {
 
     //Set webserver
     _serverPointer = new WebServer(80); 
+    
+    //CORS is enabled so the server can receive requests from other servers
+    //If CORS is not enabled, the server cannot receive requests from other servers
+
     _serverPointer->enableCORS();
 
-    //Vincular datos
+    //Link the variables with the server
+    //The variables are linked with the server so the server can send the data to the main ESP32
     AppREST::linkServer(_serverPointer);
     AppREST::linkPeso(pesoPointer);
     AppREST::linkRPM(rpmPointer);
@@ -261,12 +272,12 @@ void setup() {
     AppREST::linkPesoDeseado(pesoDeseadoPointer);
     AppREST::linkEstado(estadoPointer);
 
-    //Configurar GET
+    //Set the routes of the server and the methods that are going to be used for the GET and PUT requests
     _serverPointer->on("/valores", HTTP_GET, AppREST::GETValores);
     _serverPointer->on("/rpmDeseado", HTTP_PUT, AppREST::PUTrpmDeseado);
     _serverPointer->on("/pesoDeseado", HTTP_PUT, AppREST::PUTPesoDeseado);
 
-    //Inicializar
+    //Start the server
     _serverPointer->begin();
   }
 
@@ -282,38 +293,46 @@ void setup() {
   Serial.println ("CALIBRADO"); // Confirm the scale is ready
   Wire.begin(); // join i2c bus (address optional for master)
 
- }
+}
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() { 
-  //SErvidor de REST
+  //The state of the server is checked
   _serverPointer->handleClient();
 
 
-  peso = balanza.get_units(4) - peso_inicial; // Entrega el peso actualment medido en gramos
+  peso = balanza.get_units(4) - peso_inicial; // Measure the weight given by scale the initial value is substracted to tare the scale
   //Serial.print("Masa actual: "); 
   //Serial.println(peso); 
 
-  //Para obtener RPM del segundo micro
-  Wire.requestFrom(0X23, 2);//Direccion, bytes
+  //Obtain RPM value given by the encoder
+  Wire.requestFrom(0X23, 2);//Dir, bytes
+  //If there is data to be read
   uint8_t highByte = Wire.read();
   uint8_t lowByte = Wire.read();
+  //Data is combined to obtain the RPM value
   rpm_recibido = (highByte << 8) | lowByte;
+  
   //Serial.print("RPM actual: ");
   //Serial.println(rpm_recibido);
 
-  //Recibir valor temperatura
+  //Temp value is read
   sensorDS18B20.requestTemperatures();
   temp = sensorDS18B20.getTempCByIndex(0) + 1;
+
+
+
   //Serial.print("Temperatura actual: ");
   //Serial.println(temp, 1);
 
   //Serial.println("--------------");
   //Serial.println(agregar);
 
-  if (agregar == true){    
+  //If the pour liquid signal is received
+  if (agregar == true){
+    //the function agregar_solvente is called
     agregar_solvente(peso, peso_ant, porc1,porc2,porc3);  // Pour liquid 
     }
-
+  //If no signal is received the state is set to "esperando"
   else{
     estado = "Esperando";
   }
