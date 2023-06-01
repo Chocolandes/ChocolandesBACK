@@ -1,3 +1,9 @@
 {
-    "cmake.sourceDirectory": "/home/sebastian/Documents/Instrumentacion/ChocolandesBACK/.pio/libdeps/esp32doit-devkit-v1/ArduinoJson"
+    "cmake.sourceDirectory": "/home/sebastian/Documents/Instrumentacion/ChocolandesBACK/.pio/libdeps/esp32doit-devkit-v1/ArduinoJson",
+    "files.associations": {
+        "algorithm": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "streambuf": "cpp"
+    }
 }
